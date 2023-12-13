@@ -1,0 +1,29 @@
+#ifndef _IH_CMD_H_
+#define _IH_CMD_H_
+
+
+enum ICEHYDAR_CMD_ID
+{
+	IH_CMD_ID_RESERVE = 0,
+	IH_CMD_ID_CONN_OK ,
+	IH_RESERVE_CMD_ID_GET_SHM_INFO,
+	
+	IH_CMD_ID_DEFAULT = 188,
+};
+
+
+
+#define CMD_ALL_CONNECT_OK "IH\0\0\x01\x01\0\0"
+#define CMD_ALL_CONNECT_OK_LEN   (sizeof(CMD_ALL_CONNECT_OK)-1)
+
+
+
+
+
+
+
+
+
+
+
+#endif

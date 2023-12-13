@@ -1,0 +1,13 @@
+{
+	"ih-name":"test1-Publisher",
+	"ih-pid"  : 0,
+	"ih-cpu_bind":1
+}
+{
+	"ih-name":"test1-Subscriber-1",
+	"ih-pid"  : 10
+}
+{
+	"ih-name":"test1-Subscriber-2",
+	"ih-pid"  : 11
+}
