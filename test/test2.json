@@ -3,15 +3,19 @@
 	"ih-pid"  : 0,
 	"ih-shm":[
 		{
+		 "shm_name":"testname0",
 		 "shm_size":128
 		},
 		{
+		 "shm_name":"testname1",
 		 "shm_size":256
 		},
 		{
+		 "shm_name":"testname2",
 		 "shm_size":512
 		},
 		{
+		 "shm_name":"testname3",
 		 "shm_size":1024
 		}
 	],
@@ -20,20 +24,4 @@
 {
 	"ih-name":"test2-Subscriber-1",
 	"ih-pid"  : 100
-}
-{
-	"ih-name":"test2-Subscriber-2",
-	"ih-pid"  : 101
-}
-{
-	"ih-name":"test2-Subscriber-3",
-	"ih-pid"  : 102
-}
-{
-	"ih-name":"test2-Subscriber-4",
-	"ih-pid"  : 103
-}
-{
-	"ih-name":"test2-Subscriber-5",
-	"ih-pid"  : 104
 }

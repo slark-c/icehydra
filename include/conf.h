@@ -13,9 +13,9 @@ typedef enum
 
 typedef struct
 {
-	//char shm_name[MAX_FILE_NAME];
+	char shm_name[MAX_FILE_NAME];
 	unsigned int shm_id;
-
+    int shm_size;
 }SHM_NODE_T;
 
 typedef	struct 

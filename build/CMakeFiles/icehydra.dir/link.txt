@@ -1,0 +1,1 @@
+/usr/bin/cc -g CMakeFiles/icehydra.dir/main.c.o -o icehydra   -L/mnt/d/shared/icehydra/deplib/x86  -Wl,-rpath,/mnt/d/shared/icehydra/deplib/x86: libicehydra.a 

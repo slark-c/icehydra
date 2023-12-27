@@ -1,0 +1,2 @@
+/usr/bin/ar qc libicehydra.a CMakeFiles/icehydra-objs.dir/src/cJSON.c.o CMakeFiles/icehydra-objs.dir/src/conf.c.o CMakeFiles/icehydra-objs.dir/src/icehydra_util.c.o CMakeFiles/icehydra-objs.dir/src/shm_manager.c.o CMakeFiles/icehydra-objs.dir/src/unix_socket.c.o
+/usr/bin/ranlib libicehydra.a

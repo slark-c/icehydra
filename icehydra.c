@@ -88,13 +88,31 @@ int ih_recv_data(void *data,int *datalen)
 	return IH_RESERVE_CMD_ID_GET_SHM_INFO;
 }
 
-int ih_get_shm(int shm_id,void **ptr)
+int ih_get_shm_by_id(int shm_id,void **ptr)
 {
 	icehydra_shm_t shm_tmp = {0};
 	shm_tmp.id = shm_id;
 	*ptr = shm_mmap(&shm_tmp);
 
 	return shm_tmp.size;
+}
+
+int ih_get_shm_by_name(void *recvbuf,char *name,void **ptr)
+{
+	SHM_NODE_T *shmst_list = (SHM_NODE_T*)recvbuf;
+
+	do{
+		if(isStrSame(name,shmst_list->shm_name))
+			break;
+		
+		if(strlen(shmst_list->shm_name) == 0)
+			return -1;
+
+		shmst_list++;
+		
+	}while(1);
+	
+	return ih_get_shm_by_id(shmst_list->shm_id,ptr);
 }
 
 bool ih_recvIsShmIDs(int ret)

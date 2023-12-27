@@ -72,10 +72,9 @@ static int init_shm(pub_sub_node_t* node_start,cJSON* json)
 
 		shm_proj_id++;
 		
-		//cJSON *shm_name = cJSON_GetObjectItemCaseSensitive(shm_json_obj, "shm_name");
+		cJSON *shm_name = cJSON_GetObjectItemCaseSensitive(shm_json_obj, "shm_name");
     	cJSON *shm_size = cJSON_GetObjectItemCaseSensitive(shm_json_obj, "shm_size");		
 		
-		//strcpy(node_start->shm_node_ptr->shm_name,shm_name->valuestring);
 		//node_start->shm_node_ptr->shm_id = shm_proj_id;
 
 		icehydra_shm_t shm = {.filename = filename,
@@ -86,6 +85,8 @@ static int init_shm(pub_sub_node_t* node_start,cJSON* json)
 		assert(shm.mem_ptr != NULL);
 
 		shm_node_ptr->shm_id = shm.id;
+		shm_node_ptr->shm_size = shm.size;
+		strcpy(shm_node_ptr->shm_name,shm_name->valuestring);
 		shm_node_ptr++;
 		shm_munmap(&shm);			
 		//printf("%p %s size = %d %d\n",shm_node_ptr,shm_name->valuestring,shm_size->valueint,shm_node_num);
@@ -321,7 +322,7 @@ int broadcast_cmd(struct list_head *head,void* cmd_head,void *data)
 
 int parser_reserve_cmd(pub_sub_node_t *node_start,pub_sub_node_t *current_node,PROTOCOL_CMD* cmd)
 {
-	uint8_t buf[256] = {0};
+	uint8_t buf[2000] = {0};
 	int need_send = 0;
 	switch(GET_PROTOCOL_CMD_ID(cmd)){
 		case IH_RESERVE_CMD_ID_GET_SHM_INFO:

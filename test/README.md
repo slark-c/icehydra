@@ -20,15 +20,19 @@ The json file tells how icehydra works , like:
     "ih-pid"  : 0,
     "ih-shm":[
         {
+         "shm_name":"name1",
          "shm_size":128
         },
         {
+         "shm_name":"testname2",
          "shm_size":256
         },
         {
+         "shm_name":"testname3",
          "shm_size":512
         },
         {
+         "shm_name":"testname4",
          "shm_size":1024
         }
     ],
@@ -133,7 +137,8 @@ while(1){
 
     //check recv type is share-memory-ids
     if(ih_recvIsShmIDs(ret)){
-        //do share memory things
+        //get share memory ptr by shm_name in JSON
+        ih_get_shm_by_name(recvbuf,"testname1",&shm_ptr);
     }
 }
 ```

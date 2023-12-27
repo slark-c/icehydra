@@ -22,8 +22,6 @@ void help(void)
 		"    S (the name of Subscriber)\n"
 		"    P (the name of Publisher)\n"
 		"    i (broadcast ids. -i 11,22,33 )\n"
-	
-		//"    eg. showmethecmd -l cn -e GB2312\n"
 	);
 }
 
@@ -110,7 +108,6 @@ int main(int argc,char *argv[])
 	ret = ih_send_getShmIDs_cmd();
 	if(ret <0)
 		return -1;	
-
 	
 	uint8_t rbuf[128] = {0};
 	int recvlen;
@@ -132,11 +129,15 @@ int main(int argc,char *argv[])
 		}
 
 		if(ih_recvIsShmIDs(ret)){
-			int *shmid_list = (int*)(rbuf);
 			void *shm_ptr = NULL;
 			int shm_size = 0;
-			for(int i=0;i<recvlen/sizeof(int);i++){
-				shm_size = ih_get_shm(shmid_list[i],&shm_ptr);
+
+			for(int i=0;i<4;i++){
+				char shm_name[16] = {0};
+				sprintf(shm_name,"testname%d",i);
+				shm_size = ih_get_shm_by_name(rbuf,shm_name,&shm_ptr);
+				//if(shm_size < 0)
+				//	break;
 				printf("%d size %d %p \n",i,shm_size,shm_ptr);
 			}
 			continue;

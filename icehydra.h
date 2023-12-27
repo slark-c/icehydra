@@ -34,8 +34,7 @@ int IH_EXPORT
 ih_recv_data(void *data,int *datalen);
 
 int IH_EXPORT
-ih_get_shm(int shm_id,void **shm_ptr);
-
+ih_get_shm_by_name(void *recvbuf,char *shm_name,void **shm_ptr);
 
 bool IH_EXPORT
 ih_recvIsShmIDs(int ret);
