@@ -117,16 +117,13 @@ static void un_accept_cb(struct ev_loop* loop, ev_io  *w, int revents) {
 	}
 }
 #endif
-#define remove_node() 	({	FD_CLR(current_node->connfd,&rset); \
-							close_s(current_node->connfd);	\
-							list_del(&current_node->node_list); \
-							free_s(current_node);  \
-							node_start->pub_links_num -= 1;})
-							
+#define remove_node() 	({	close_s(current_node->connfd);	\
+							link_count -= 1;\
+						})
 int main(int argc ,char *argv[])
 { 	
 	int ret;
-	
+	struct timeval timeout;
 	ret = argp_parse (&argp, argc, argv, 0, 0, &arguments);
 
 	if(!strlen(arguments.file)){
@@ -142,88 +139,74 @@ int main(int argc ,char *argv[])
 	
 	bind_cpu(node_start->cpu_bind);
 	
-	char *un_server_name = name_fix(NAME_PREFIX,node_start->name,SOCK_NAME_SUFFIX);
-	
+	char *un_server_name = name_fix(NAME_PREFIX,node_start->name,SOCK_NAME_SUFFIX);	
 	int sockfd = creat_bind_unix_tcp(un_server_name);
 	assert(sockfd > 0);
-
 	listen_unix_tcp(sockfd,32);
-	
 	free(un_server_name);
-		
 	
-	int connfd = -1,max_conn = -1;
-	fd_set rset,wset,tmp_rset;
-	FD_ZERO(&rset);
-	FD_ZERO(&wset);
-	
+	uint8_t *rbuf  = calloc(1,MAX_CMD_LEN);
+	assert(rbuf != NULL);
+
 	struct list_head * current_node_list = NULL;
 	pub_sub_node_t *current_node = NULL;
-	for(int count = 0;count<node_start->pub_links_num;){	
-
-		char un[MAX_PATH] = {0};
-		connfd = accept_unix_tcp(sockfd,un);
-		if(connfd < 0) 
-			continue;
-		
-	#ifndef NDEBUG
-		printf("client connect %s \n",un);
-	#endif
 	
-		max_conn = connfd > max_conn ? connfd:max_conn;
-		
-		//pub_sub_node_t *current_node = NULL; 
+	char un[MAX_PATH] = {0};
+	int connfd = -1,maxfd = -1,max_conn_fd = -1,link_count=0;
+	fd_set rset;
+	while(1){
 
+		FD_ZERO(&rset);
+		FD_SET(sockfd,&rset);
 		list_for_each(current_node_list,&node_start->node_list){
 			current_node = list_entry(current_node_list, pub_sub_node_t, node_list);
-			if(isStrSameN(current_node->name,un+NAME_PREFIX_LEN,strLen(current_node->name))){
-				//strcpy(current_node->sock_name,un);
-				current_node->connfd = connfd;
-				FD_SET(connfd, &rset);
-			}
-		}	
-		count++;
-	}
-
-	list_for_each(current_node_list,&node_start->node_list){
-		current_node = list_entry(current_node_list, pub_sub_node_t, node_list);
-		ret = tcp_send_noblock(current_node->connfd,CMD_ALL_CONNECT_OK,CMD_ALL_CONNECT_OK_LEN);
-		if(ret < 0){
-			remove_node();
+			max_conn_fd = max(current_node->connfd,max_conn_fd);
+			if(current_node->connfd > 0)
+				FD_SET(current_node->connfd,&rset);
 		}
-	}
+		
+		maxfd = max(sockfd,max_conn_fd);
 	
-
-	//find_node(&node_start->node_list,255);
-	
-	uint8_t *rbuf  = calloc(MAX_CMD_LEN,1);
-	assert(rbuf != NULL);		
-	struct timeval timeout;
-	while(1)
-	{
-		FD_ZERO(&tmp_rset);
-		memcpy(&tmp_rset,&rset,sizeof(rset));
-		timeout.tv_sec = 1;
+		timeout.tv_sec  = 1;
 		timeout.tv_usec = 0;
-		ret = select(max_conn + 1, &tmp_rset, NULL, NULL, &timeout);
-		if(ret <= 0){
+		ret = select(maxfd + 1, &rset, NULL, NULL, &timeout);
+		if(ret <= 0)
 			continue;
-		}
+
+		if(FD_ISSET(sockfd, &rset)){
+			memzero(un, MAX_PATH);
+			connfd = accept_unix_tcp(sockfd,un);
+			if(connfd < 0) 
+				continue;
+			
+		#ifndef NDEBUG
+			printf("client connect %s \n",un);
+		#endif
 		
+			list_for_each(current_node_list,&node_start->node_list){
+				current_node = list_entry(current_node_list, pub_sub_node_t, node_list);
+				if(isStrSameN(current_node->name,un+NAME_PREFIX_LEN,strLen(current_node->name))){
+					current_node->connfd = connfd;
+					link_count++;
+				}
+			}	
+		}
+
 		list_for_each(current_node_list,&node_start->node_list){
 			current_node = list_entry(current_node_list, pub_sub_node_t, node_list);
-
-			if(!FD_ISSET(current_node->connfd, &tmp_rset))
+			if(current_node->connfd < 0)
 				continue;
 
+			if(!FD_ISSET(current_node->connfd,&rset))
+				continue;
+			
 			memzero(rbuf,MAX_CMD_LEN);
-
+						
 			ret = tcp_recv_protocol_cmd(current_node->connfd,rbuf,rbuf+PROTOCOL_CMD_HEAD_LEN);
 			if(ret < 0){
 				remove_node();
 				continue;
 			}
-
 		#ifndef NDEBUG
 			print_cmd_head((PROTOCOL_CMD*)rbuf);
 			print_data_char(GET_PROTOCOL_CMD_BROADCAST_NUM(rbuf),rbuf+PROTOCOL_CMD_HEAD_LEN);
@@ -240,12 +223,11 @@ int main(int argc ,char *argv[])
 
 			ret = broadcast_cmd(&node_start->node_list,rbuf,rbuf+PROTOCOL_CMD_HEAD_LEN);
 			if(ret < 0){
-				current_node = find_node(&node_start->node_list,-ret);
-				if(current_node){
-					remove_node();
+				pub_sub_node_t *errnode = find_node(&node_start->node_list,-ret);
+				if(errnode){
+					close_s(errnode->connfd);
 				}
-			}
-				
+			}	
 		}
 	}
 

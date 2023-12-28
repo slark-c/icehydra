@@ -72,9 +72,6 @@ The subscriber process is easy to connect to the broker .
 //create and connect to the broker,use the name configured in json file
 ih_subscriber_create_connect("test2-Subscriber-1","test2-Publisher");
 
-//wait other subscriber process
-//this is a blocking function
-ih_wait_other_process();
 ```
 
 Then you can send messages  through send-apis

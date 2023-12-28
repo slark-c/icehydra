@@ -85,7 +85,7 @@ int main(int argc,char *argv[])
 	
 	int datalen = strlen(str);
 
-	ih_wait_other_process();
+	//ih_wait_other_process();
 
 	if(needsend){
 		

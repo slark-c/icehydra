@@ -21,9 +21,6 @@ typedef struct
 int IH_EXPORT
 ih_subscriber_create_connect(char *subscriber_name,char *publisher_name);
 
-void IH_EXPORT
-ih_wait_other_process(void);
-
 int IH_EXPORT
 ih_send_broadcast_data(IH_BROADCAST_CMD_T *cmd);
 

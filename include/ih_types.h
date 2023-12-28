@@ -9,6 +9,8 @@
 
 #define MAX_SHELL_CMD  256
 #define MAX_PATH 128
+#define MAX_CONNS 64
+
 #define MAX_FILE_NAME 32
 #define MAX_CMD_LEN (4*Kib)
 
