@@ -21,18 +21,9 @@
 struct arguments
 {                  
   char *date;      
-  char  file[256]; 
+  char  file[MAX_PATH]; 
   int daemon;
   int head;
-};
-
-struct unix_client_t
-{
-	int connfd;
-
-	char name[64];
-
-	struct list_head un_list;
 };
 
 static int parse_opt (int key, char *arg, struct argp_state *state){
@@ -46,11 +37,6 @@ static int parse_opt (int key, char *arg, struct argp_state *state){
 		case 'f':
 			if(!access(arg, F_OK | R_OK))
 				strcpy(arguments->file,arg);
-			break;
-		case 'H':
-			arguments->head = atoi(arg);
-			break;
-		case 'h':
 			break;
 		case ARGP_KEY_ARG:
 			 //if (state->arg_num >= 2)
@@ -70,44 +56,23 @@ static int parse_opt (int key, char *arg, struct argp_state *state){
 }
 
 static struct argp_option options[] = {
-  {"Daemon",   'D', 0,      0,  "Run in Daemon" },
+  {"Daemon",   'D', 0,      OPTION_ARG_OPTIONAL,  "Run in Daemon" },
   {"file",     'f', "FILE", 0,"Config json file to input" },  
+  {0, 0, 0, 0, "Informational Options:", -1},
   { 0 }
 };
   
 static char doc[] ="icehydra -- a mulit-process mamager program \v";
 
-static struct argp argp = {options,parse_opt,0,doc};
+static struct argp argp = { .options = options,
+							.parser = parse_opt,
+							.args_doc = 0,
+							.doc = doc};
+
 const char *argp_program_version = "version 0.4.3";
 
 struct arguments arguments = {0};
 
-#if 0
-void read_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
-{
-	char buf[100] = {0};
-	tcp_recv_noblock(watcher->fd,buf,10);
-
-	printf("buf %s \n",buf);
-}
-static void un_accept_cb(struct ev_loop* loop, ev_io  *w, int revents) {
-	
-	int connfd = -1;
-	char un[128] = {0};
-	memset(un,0,sizeof(un));
-	connfd = accept_unix_tcp(w->fd,un);
-
-	if(connfd > 0)
-	{
-		printf("new conn accepted %d \n",connfd);
-		set_nonblock(connfd);
-
-		struct ev_io *w_client = (struct ev_io*) malloc (sizeof(struct ev_io));
-	    ev_io_init(w_client, read_cb, connfd, EV_READ);
-	    ev_io_start(loop, w_client);
-	}
-}
-#endif
 #define remove_node() 	({	close_s(current_node->connfd);	\
 							link_count -= 1;\
 						})
