@@ -19,8 +19,7 @@
 
 
 struct arguments
-{
-  char *version;                   
+{                  
   char *date;      
   char  file[256]; 
   int daemon;
@@ -41,10 +40,6 @@ static int parse_opt (int key, char *arg, struct argp_state *state){
 	struct arguments *arguments = state->input;
 	
 	switch (key){
-	    case 'v': 
-			printf ("Version : %s \n",arguments->version);
-			//printf ("Date    : %s \n",arguments->date); 
-			break;
 		case 'D':
 			arguments->daemon = true;
 			break;
@@ -75,21 +70,17 @@ static int parse_opt (int key, char *arg, struct argp_state *state){
 }
 
 static struct argp_option options[] = {
-  {"version",  'v', 0,      0,  "Produce verbose output" },
   {"Daemon",   'D', 0,      0,  "Run in Daemon" },
-  //{"help",     'h', 0, 0,   " Give this help list" },
   {"file",     'f', "FILE", 0,"Config json file to input" },  
-  //{"head",     'H', "NUM", 0,"Max num of Heads" },
   { 0 }
 };
   
 static char doc[] ="icehydra -- a mulit-process mamager program \v";
 
 static struct argp argp = {options,parse_opt,0,doc};
+const char *argp_program_version = "version 0.4.3";
 
-struct arguments arguments = {
-		.version = "0.4.2",
-};
+struct arguments arguments = {0};
 
 #if 0
 void read_cb(struct ev_loop *loop, struct ev_io *watcher, int revents)
@@ -127,7 +118,7 @@ int main(int argc ,char *argv[])
 	ret = argp_parse (&argp, argc, argv, 0, 0, &arguments);
 
 	if(!strlen(arguments.file)){
-		//fprintf(stderr,"[Error] : Config File not Found \n");
+		fprintf(stderr,"[Error] : Config File not Found \n");
 		return -1;
 	}
 	
