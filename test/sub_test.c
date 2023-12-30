@@ -138,7 +138,7 @@ int main(int argc,char *argv[])
 				shm_size = ih_get_shm_by_name(rbuf,shm_name,&shm_ptr);
 				//if(shm_size < 0)
 				//	break;
-				printf("%d size %d %p \n",i,shm_size,shm_ptr);
+				printf("%s size %d %p \n",shm_name,shm_size,shm_ptr);
 			}
 			continue;
 		}

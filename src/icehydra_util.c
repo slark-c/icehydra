@@ -112,7 +112,7 @@ int make_dir(const char *path)
 char *name_fix(char *prefix,char *name,char *suffix)
 {
 	int len = strLen(prefix)+strLen(name)+strLen(suffix);
-	char *fixed = calloc(len,1);
+	char *fixed = calloc(1,len);
 	if(!fixed)
 		return NULL;
 	
@@ -144,7 +144,7 @@ int read_file(char* filename , char **data)
 		return -1;
 	}
 
-	readlen = fread(*data,1,size,fp);
+	readlen = fread(*data,size,1,fp);
 	if(readlen != size)
 	{
 		fclose(fp);

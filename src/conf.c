@@ -49,7 +49,7 @@ static json_item item_list[] = {
 
 static pub_sub_node_t *create_pub_sub_object()
 {
-	pub_sub_node_t *obj = calloc(sizeof(pub_sub_node_t),1);
+	pub_sub_node_t *obj = calloc(1,sizeof(pub_sub_node_t));
 	assert(obj != NULL);
 	return obj;
 }
