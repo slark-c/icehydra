@@ -88,7 +88,7 @@ static char doc[] ="icehydra -- a mulit-process mamager program \v";
 static struct argp argp = {options,parse_opt,0,doc};
 
 struct arguments arguments = {
-		.version = "0.4.1",
+		.version = "0.4.2",
 };
 
 #if 0
@@ -189,7 +189,11 @@ int main(int argc ,char *argv[])
 					current_node->connfd = connfd;
 					link_count++;
 				}
-			}	
+				else{
+					close_s(connfd);
+				}
+			}
+			continue;
 		}
 
 		list_for_each(current_node_list,&node_start->node_list){
