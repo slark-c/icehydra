@@ -185,7 +185,8 @@ int main(int argc ,char *argv[])
 		
 			list_for_each(current_node_list,&node_start->node_list){
 				current_node = list_entry(current_node_list, pub_sub_node_t, node_list);
-				if(isStrSameN(current_node->name,un+NAME_PREFIX_LEN,strLen(current_node->name))){
+				if(isStrSameN(current_node->name,un+NAME_PREFIX_LEN,strLen(current_node->name))
+					&& (strlen(current_node->name) == strlen(un)-NAME_PREFIX_LEN-SOCK_NAME_SUFFIX_LEN)){
 					current_node->connfd = connfd;
 					link_count++;
 				}
