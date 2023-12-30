@@ -35,18 +35,6 @@ static json_item item_list[] = {
 	  
 };
 
-/*static json_item shm_item_list[] = {
-
-	{ .key = "shm_name",},
-
-	{ .key = "shm_id", },
-
-	{ .key = "shm_size",},
-	{ .key = "ih-shm", },
-};*/
-
-//static int node_id_list[64] = {[0 ... 63] = -1};
-
 static pub_sub_node_t *create_pub_sub_object()
 {
 	pub_sub_node_t *obj = calloc(1,sizeof(pub_sub_node_t));
@@ -138,9 +126,6 @@ static pub_sub_node_t *get_icehydra_json_node(cJSON* json)
 
 pub_sub_node_t *get_node_start(char *file,char *key)
 {
-#define Publisher  "Publisher"
-#define Subscriber "Subscriber"
-
 	char *json_string = NULL;
 
 	int size = read_file(file,&json_string);
@@ -175,10 +160,6 @@ pub_sub_node_t *get_node_start(char *file,char *key)
 	result_node->pub_links_num = node_count-1;
 	free(json_string);
 	return result_node;	
-
-#undef Publisher
-#undef Subscriber
-
 }
 pub_sub_node_t *find_node_by_id(struct list_head *head,int id)
 {	

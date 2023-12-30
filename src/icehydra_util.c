@@ -145,7 +145,7 @@ int read_file(char* filename , char **data)
 	}
 
 	readlen = fread(*data,size,1,fp);
-	if(readlen != size)
+	if(readlen != 1)
 	{
 		fclose(fp);
 		free(*data);
