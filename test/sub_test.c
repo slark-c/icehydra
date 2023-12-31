@@ -85,7 +85,22 @@ int main(int argc,char *argv[])
 	
 	int datalen = strlen(str);
 
-	//ih_wait_other_process();
+	uint8_t shm_nifos[800] = {0};
+	ret = ih_get_shm_infos(shm_nifos,800);
+	if(ret <0)
+		exit(-1);
+
+	{
+		void *shm_ptr = NULL;
+		int shm_size = 0;
+
+		for(int i=0;i<4;i++){
+			char shm_name[16] = {0};
+			sprintf(shm_name,"testname%d",i);
+			shm_size = ih_get_shm_by_name(shm_nifos,shm_name,&shm_ptr);
+			printf("%s size %d %p \n",shm_name,shm_size,shm_ptr);
+		}
+	}
 
 	if(needsend){
 		
@@ -105,10 +120,6 @@ int main(int argc,char *argv[])
 		}
 	}
 
-	ret = ih_send_getShmIDs_cmd();
-	if(ret <0)
-		return -1;	
-	
 	uint8_t rbuf[128] = {0};
 	int recvlen;
 	struct timeval timeout;
@@ -126,21 +137,6 @@ int main(int argc,char *argv[])
 		if(ret < 0){			
 			printf("error recv \n");
 			exit(-1);
-		}
-
-		if(ih_recvIsShmIDs(ret)){
-			void *shm_ptr = NULL;
-			int shm_size = 0;
-
-			for(int i=0;i<4;i++){
-				char shm_name[16] = {0};
-				sprintf(shm_name,"testname%d",i);
-				shm_size = ih_get_shm_by_name(rbuf,shm_name,&shm_ptr);
-				//if(shm_size < 0)
-				//	break;
-				printf("%s size %d %p \n",shm_name,shm_size,shm_ptr);
-			}
-			continue;
 		}
 
 		printf("%s client recv : %s \n",name,rbuf);

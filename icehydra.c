@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <assert.h>
@@ -97,12 +98,13 @@ int ih_get_shm_by_id(int shm_id,void **ptr)
 	return shm_tmp.size;
 }
 
-int ih_get_shm_by_name(void *recvbuf,char *name,void **ptr)
+int ih_get_shm_by_name(void *infobuf,char *name,void **ptr)
 {
-	SHM_NODE_T *shmst_list = (SHM_NODE_T*)recvbuf;
+	SHM_NODE_T *shmst_list = (SHM_NODE_T*)infobuf;
 
 	do{
-		if(isStrSame(name,shmst_list->shm_name))
+		if(isStrSame(name,shmst_list->shm_name)
+			&& strlen(name) == strlen(shmst_list->shm_name))
 			break;
 		
 		if(strlen(shmst_list->shm_name) == 0)
@@ -118,6 +120,39 @@ int ih_get_shm_by_name(void *recvbuf,char *name,void **ptr)
 bool ih_recvIsShmIDs(int ret)
 {
 	return (IH_RESERVE_CMD_ID_GET_SHM_INFO == ret);
+}
+
+int ih_get_shm_infos(void *buffer,int buffersize)
+{
+	uint8_t wbuf[64] = {0};
+	int ret;
+	set_pure_protocol_head(wbuf,0,IH_CMD_TYPE_SEND_RESERVE,IH_RESERVE_CMD_ID_GET_SHM_NUM);
+	tcp_send_protocol_cmd(client_connfd,wbuf,wbuf+PROTOCOL_CMD_HEAD_LEN);
+
+	do{
+		memzero(wbuf,sizeof(wbuf));
+		ret = tcp_recv_protocol_cmd(client_connfd,wbuf,wbuf+PROTOCOL_CMD_HEAD_LEN);
+		if(ret <0)
+			return -1;
+		
+	}while(GET_PROTOCOL_CMD_ID(wbuf) != IH_RESERVE_CMD_ID_GET_SHM_NUM);
+	
+	int shm_num = wbuf[PROTOCOL_CMD_HEAD_LEN];
+	if(sizeof(SHM_NODE_T)*shm_num > buffersize){
+		fprintf(stderr,"buffsersize %d too small \n",buffersize);
+		return -1;
+	}
+
+	if(shm_num == 0)
+		return 0;
+	
+	ret = ih_send_getShmIDs_cmd();
+	if(ret < 0)
+		return ret;
+
+	int datalen = 0;	
+	ret = ih_recv_data(buffer,&datalen);
+	return datalen/sizeof(SHM_NODE_T);	
 }
 
 bool ih_select_recv_ready(struct timeval *timeout)

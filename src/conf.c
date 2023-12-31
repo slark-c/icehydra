@@ -305,14 +305,23 @@ int parser_reserve_cmd(pub_sub_node_t *node_start,pub_sub_node_t *current_node,P
 {
 	uint8_t buf[2000] = {0};
 	int need_send = 0;
+	void *sendbuf = NULL;
 	switch(GET_PROTOCOL_CMD_ID(cmd)){
 		case IH_RESERVE_CMD_ID_GET_SHM_INFO:
 		{
 			int bodylen = sizeof(SHM_NODE_T)*node_start->shm_node_num;
 			set_pure_protocol_head(buf,bodylen,0,IH_RESERVE_CMD_ID_GET_SHM_INFO);
+			sendbuf = node_start->shm_node_ptr;
 			need_send = 1;
 		}
 			break;
+		case IH_RESERVE_CMD_ID_GET_SHM_NUM:
+		{
+			set_pure_protocol_head(buf,1,0,IH_RESERVE_CMD_ID_GET_SHM_NUM);
+			sendbuf = buf+PROTOCOL_CMD_HEAD_LEN;
+			buf[PROTOCOL_CMD_HEAD_LEN] = node_start->shm_node_num;
+			need_send = 1;
+		}
 		default:
 			break;
 	}
@@ -320,7 +329,7 @@ int parser_reserve_cmd(pub_sub_node_t *node_start,pub_sub_node_t *current_node,P
 	if(!need_send)
 		return 0;
 
-	int ret = tcp_send_protocol_cmd(current_node->connfd,buf,node_start->shm_node_ptr);
+	int ret = tcp_send_protocol_cmd(current_node->connfd,buf,sendbuf);
 	
 	return ret;
 }
