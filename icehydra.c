@@ -151,7 +151,16 @@ int ih_get_shm_infos(void *buffer,int buffersize)
 		return ret;
 
 	int datalen = 0;	
-	ret = ih_recv_data(buffer,&datalen);
+	do{
+		struct timeval timeout;
+		timeout.tv_sec = 1;
+		timeout.tv_usec = 0;
+		if(!ih_select_recv_ready(&timeout))
+			continue;
+		
+		ret = ih_recv_data(buffer,&datalen);
+	}while(!ih_recvIsShmIDs(ret));
+	
 	return datalen/sizeof(SHM_NODE_T);	
 }
 
