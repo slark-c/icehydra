@@ -126,8 +126,10 @@ int main(int argc ,char *argv[])
 		timeout.tv_sec  = 1;
 		timeout.tv_usec = 0;
 		ret = select(maxfd + 1, &rset, NULL, NULL, &timeout);
-		if(ret <= 0)
+		if(ret == 0)
 			continue;
+		else if(ret < 0)
+			break;
 
 		if(FD_ISSET(sockfd, &rset)){
 			memzero(un, MAX_PATH);
@@ -146,9 +148,9 @@ int main(int argc ,char *argv[])
 					current_node->connfd = connfd;
 					link_count++;
 				}
-				else{
+				/*else{
 					close_s(connfd);
-				}
+				}*/
 			}
 			continue;
 		}
