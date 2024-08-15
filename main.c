@@ -69,7 +69,7 @@ static struct argp argp = { .options = options,
 							.args_doc = 0,
 							.doc = doc};
 
-const char *argp_program_version = "version 0.4.3";
+const char *argp_program_version = "version 0.4.4";
 
 struct arguments arguments = {0};
 
