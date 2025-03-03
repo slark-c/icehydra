@@ -46,6 +46,9 @@ int ih_send_broadcast_data(IH_BROADCAST_CMD_T *cmd)
 {
 	uint8_t cmd_head[64] = {0};
 	int ret = 0;
+
+	if(client_connfd < 0)
+		return -1;
 	
 	set_broadcast_cmd_head(cmd_head,cmd->datalen,IH_CMD_ID_DEFAULT,cmd->br_num);	
 	set_pure_broadcast_field(cmd_head,NULL,cmd->br_num,cmd->br_ids);
@@ -61,6 +64,9 @@ int ih_send_broadcast_data(IH_BROADCAST_CMD_T *cmd)
 
 int ih_send_getShmIDs_cmd(void)
 {
+	if(client_connfd < 0)
+		return -1;
+	
 	uint8_t wbuf[64] = {0};
 	set_pure_protocol_head(wbuf,0,IH_CMD_TYPE_SEND_RESERVE,IH_RESERVE_CMD_ID_GET_SHM_INFO);
 	return tcp_send_protocol_cmd(client_connfd,wbuf,wbuf+PROTOCOL_CMD_HEAD_LEN);
@@ -68,6 +74,9 @@ int ih_send_getShmIDs_cmd(void)
 
 int ih_recv_data(void *data,int *datalen)
 {
+	if(client_connfd < 0)
+		return -1;
+	
 	PROTOCOL_CMD cmd_head = {0};
 	*datalen = 0;
 	int ret = tcp_recv_protocol_cmd(client_connfd,&cmd_head,data);	
@@ -124,6 +133,9 @@ bool ih_recvIsShmIDs(int ret)
 
 int ih_get_shm_infos(void *buffer,int buffersize)
 {
+	if(client_connfd < 0)
+		return -1;
+	
 	uint8_t wbuf[64] = {0};
 	int ret;
 	set_pure_protocol_head(wbuf,0,IH_CMD_TYPE_SEND_RESERVE,IH_RESERVE_CMD_ID_GET_SHM_NUM);
@@ -166,6 +178,9 @@ int ih_get_shm_infos(void *buffer,int buffersize)
 
 bool ih_select_recv_ready(struct timeval *timeout)
 {
+	if(client_connfd < 0)
+		return false;
+	
 	fd_set rset;
 	struct timeval ih_timeout;
 

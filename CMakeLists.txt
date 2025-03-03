@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.15 )
 
-set(version 0.4)
+set(version 0.5)
 project(icehydra VERSION ${version} LANGUAGES C)
 
 set(project_prefix "icehydra")
