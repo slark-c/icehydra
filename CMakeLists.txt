@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.15 )
 
-set(version 0.5)
+set(version 1.0)
 project(icehydra VERSION ${version} LANGUAGES C)
 
 set(project_prefix "icehydra")
@@ -94,10 +94,11 @@ if(BUILD_SHARED_LIBS)
 	set_target_properties(${project_prefix}-shared 
 				PROPERTIES 
 				VERSION ${version} 
-				SOVERSION 0 
+				SOVERSION 1
 				PUBLIC_HEADER "icehydra.h"
 				C_VISIBILITY_PRESET hidden
 				OUTPUT_NAME ${PROJECT_NAME})
+	target_link_libraries(${project_prefix}-shared -lrt)
 
 	add_library (${project_prefix}-static STATIC $<TARGET_OBJECTS:${project_prefix}-objs>)
 	target_compile_options(${project_prefix}-static PRIVATE ${GLOBAL_C_FLAGS})
@@ -106,10 +107,11 @@ if(BUILD_SHARED_LIBS)
 				PUBLIC_HEADER "icehydra.h"
 				C_VISIBILITY_PRESET hidden
 				OUTPUT_NAME ${PROJECT_NAME})
+	target_link_libraries(${project_prefix}-static -lrt)
 	
 	add_executable(${PROJECT_NAME} main.c)
 	target_compile_options(${PROJECT_NAME} PRIVATE ${GLOBAL_C_FLAGS})
-	target_link_libraries(${PROJECT_NAME} ${project_prefix}-static)
+	target_link_libraries(${PROJECT_NAME} ${project_prefix}-static -lpthread -lrt)
 	
 endif()
 

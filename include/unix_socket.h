@@ -1,11 +1,7 @@
 #ifndef _UNIX_SOCKET_H_
 #define _UNIX_SOCKET_H_
 
-int creat_bind_unix_tcp(const char *name);
-
-int listen_unix_tcp(int sockfd , int backlog);
-
-int accept_unix_tcp(int sockfd,char * cli_name);
+int create_bind_unix_tcp(const char *path,bool isServer);
 
 int multi_client_conn_thread(void *args,void *(*start_routine) (void *));
 
@@ -17,6 +13,8 @@ int recv_fd_unix_domain(int sockfd);
 
 int tcp_recv_protocol_cmd(int sockfd,void *cmd_head,void *data);
 int tcp_send_protocol_cmd(int sockfd,void* cmd_head,void *data);
+int tcp_send_protocol(int sockfd,void* cmd_head,void *cmd_head_data,int cmd_head_data_len,void *data,int datelen);
+uint16_t parse_decimal_dot_string_to_hex(const char *input) ;
 
 int wait_all_unix_connet(int sockfd);
 

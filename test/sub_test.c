@@ -6,7 +6,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "icehydra.h"
+#include "../icehydra.h"
 
 #define strLen(str)        ((!str)?0:strlen(str))
 #define memzero(buf, n)       (void) memset(buf, 0, n)
@@ -18,10 +18,10 @@ void help(void)
 		"    v (show version )\n"
 		"    h (show help info)\n"		
 		"    D (run in Daemon.)\n"		
-		"    s (need send msg string.)\n"
-		"    S (the name of Subscriber)\n"
-		"    P (the name of Publisher)\n"
-		"    i (broadcast ids. -i 11,22,33 )\n"
+		"    s (source id.)\n"
+		"    S (send string)\n"
+		"    d (dst ip)\n"
+		"    f (file conf)\n"
 	);
 }
 
@@ -42,18 +42,29 @@ static void find_atoi(char *string,uint8_t *ids,uint8_t *ids_num)
 
 int main(int argc,char *argv[])	
 {
-	char name[128] = {0},pub_name[128] = {0};
+	char name[128] = {0};
 	int ret,ch,deamon = 0,needsend = 0;
 	uint8_t ids_num=0,ids[128] = {0};
-	char str[128] = {0};
-	while((ch = getopt(argc,argv,"hvDi:s:P:S:"))!= EOF)
+	char str[128] = {0};	
+	IH_BROADCAST_CMD_T to_send = {0};
+	to_send.br_num = 1;
+	while((ch = getopt(argc,argv,"hvDi:s:P:S:d:"))!= EOF)
 	{
 		switch(ch){
 			case 'i':
 				find_atoi(optarg,ids,&ids_num);
 				break;
+			case 's':
+				to_send.from_address_string = calloc(1,8);
+				strcpy(to_send.from_address_string,optarg);
+				break;
+			case 'd':
+				to_send.address_string = calloc(1,8);
+				strcpy(to_send.address_string,optarg);
+				break;
 			case 'S':
-				strcpy(name,optarg);
+				strcpy(str,optarg);
+				needsend = 1;
 				break;
 			case 'v':
 			case 'h':
@@ -63,12 +74,7 @@ int main(int argc,char *argv[])
 			case 'D':
 				deamon = 1;
 				break;
-			case 's':
-				needsend = 1;
-				strcpy(str,optarg);
-				break;
 			case 'P':
-				strcpy(pub_name,optarg);
 				break;
 			default:
 				break;
@@ -77,70 +83,54 @@ int main(int argc,char *argv[])
 
 	if(deamon)
 		ret = daemon(1,1);
-	assert(strLen(name));
+
+
 	
-	ret = ih_subscriber_create_connect(name,pub_name);
+	ret = ih_subscriber_create_connect(&to_send);
 	if(ret < 0)
 		return -1;
 	
-	int datalen = strlen(str);
+	to_send.data = calloc(1,1024);
+	
+	if(!needsend){
+		struct timeval timeout;
+		while(1) 
+		{
+			
+			timeout.tv_sec = 1;
+			timeout.tv_usec = 0;
+			if(!ih_select_recv_ready(&to_send,&timeout))
+				continue;
+			
+			memzero(to_send.data, 1024);
+			
+			ret = ih_recv_data(&to_send);
+			if(ret < 0){			
+				printf("error recv \n");
+				exit(-1);
+			}
 
-	uint8_t shm_nifos[800] = {0};
-	ret = ih_get_shm_infos(shm_nifos,800);
-	if(ret <0)
-		exit(-1);
-
-	{
-		void *shm_ptr = NULL;
-		int shm_size = 0;
-
-		for(int i=0;i<4;i++){
-			char shm_name[16] = {0};
-			sprintf(shm_name,"testname%d",i);
-			shm_size = ih_get_shm_by_name(shm_nifos,shm_name,&shm_ptr);
-			printf("%s size %d %p \n",shm_name,shm_size,shm_ptr);
+			printf("%x ,from 0x%x recv : %s ,len %d\n",to_send.address_u16,to_send.from_address_u16,(char*)to_send.data,to_send.datalen);
+				
 		}
+
+		return 0;
 	}
 
-	if(needsend){
-		
-		IH_BROADCAST_CMD_T cmdtest = {
-						.br_ids = ids,
-						.br_num = ids_num,
-
-						.data = str,
-						.datalen = datalen,
-					
-		};
-						
-		ret = ih_send_broadcast_data(&cmdtest);	
-		if(ret < 0){
-			printf("client send %d bytes %s \n",datalen,ret?"Fail":"SUCCESS");
-			return -1;
-		}
-	}
-
-	uint8_t rbuf[128] = {0};
-	int recvlen;
-	struct timeval timeout;
-	while(1) 
-	{
-		
-		timeout.tv_sec = 1;
-		timeout.tv_usec = 0;
-		if(!ih_select_recv_ready(&timeout))
-			continue;
-		
-		memzero(rbuf, sizeof(rbuf));
-		
-		ret = ih_recv_data(rbuf,&recvlen);
+	int count = 0;
+	while(1){
+		memzero(to_send.data, 1024);
+		sprintf(to_send.data,"%s%d",str,count);
+		to_send.datalen = strlen(to_send.data);
+		printf("send %s,len %d \n",(char*)to_send.data,to_send.datalen);
+		ret = ih_send_broadcast_data(&to_send);
 		if(ret < 0){			
-			printf("error recv \n");
+			printf("error send \n");
 			exit(-1);
 		}
+		count++;
 
-		printf("%s client recv : %s \n",name,rbuf);
-			
+		sleep(2);
 	}
 	return 0;
 }

@@ -1,5 +1,7 @@
 #include <stddef.h>
 #include <errno.h>
+#include <stdlib.h>
+#include <ctype.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <sys/un.h>
@@ -7,266 +9,163 @@
 #include <sys/stat.h>
 #include <pthread.h>
 
-#include "icehydra_util.h"
-#include "icehydra_cmd.h"
+#include "socket99.h"
 #include "conf.h"
 
-int creat_bind_unix_tcp(const char *name)
-{
-	int fd,size;
-
-	struct sockaddr_un un;
-
-	if(strlen(name) > sizeof(un.sun_path))
-		return -1;
-
-	unlink(name);
-	
-	memset(&un,0,sizeof(un));
-	un.sun_family = AF_UNIX;	
-	strcpy(un.sun_path,name);
-	size = offsetof(struct sockaddr_un , sun_path) + strlen(un.sun_path);
-
-	if((fd=socket(AF_UNIX,SOCK_STREAM,0)) < 0){
-		printf("%s %d, %s \n",__FILE__,__LINE__,strerror(errno));
-		return -1;
-	}
-	
-	if(bind(fd , (struct sockaddr *)&un,size) < 0){		
-		printf("%s %d, %s \n",__FILE__,__LINE__,strerror(errno));
-		return -1;
-	}
-
-	
-	chmod(un.sun_path,0666);
-	
-	//if(listen(fd , 64) < 0)
-	//	return -1;
-
-	return fd;
+static bool delete_or_ignore(char *path) {
+    int ures = unlink(path);
+    if (ures == -1) {
+        if (errno == ENOENT) {
+            errno = 0;
+        } else {
+            return false;
+        }
+    }
+    return true;
 }
 
-int listen_unix_tcp(int sockfd , int backlog)
+int create_bind_unix_tcp(char *path,bool isServer)
 {
-	return listen(sockfd,backlog);
+	socket99_config cfg = {
+		.path = path,
+	};
+
+	if(isServer){
+		cfg.server = isServer;
+		if (!delete_or_ignore(ICEHYDRA_ROUTE_NAME))
+			return -1;
+	}
+	
+	socket99_result res;
+	bool ok = socket99_open(&cfg, &res);
+	if (!ok) {
+		socket99_fprintf(stderr, &res);
+		return -1;
+	}
+	
+	int recv_buf_size = 0;
+	socklen_t optlen = sizeof(recv_buf_size);
+	getsockopt(res.fd, SOL_SOCKET, SO_RCVBUF,&recv_buf_size, &optlen);
+	if(recv_buf_size < 2*Mib){
+		optlen = sizeof(recv_buf_size);
+		recv_buf_size = 2*Mib;
+		setsockopt(res.fd, SOL_SOCKET, SO_RCVBUF,&recv_buf_size,optlen);
+		optlen = sizeof(recv_buf_size);
+		getsockopt(res.fd, SOL_SOCKET, SO_RCVBUF,&recv_buf_size, &optlen);
+	}
+	
+	return res.fd;
 }
 
-int accept_unix_tcp(int sockfd,char *cli_name)
+int send_fd_unix_domain(int sockout , int fd)
 {
-	int connfd ;
-	char name[128] = {0};
-	struct sockaddr_un un;
-	struct stat statbuf;
-	socklen_t  len  = sizeof(un);
-	
-	connfd = accept(sockfd,(struct sockaddr *)&un,&len);
-	if(connfd > 0){
-		//printf("len = %d %s \n",len,un.sun_path);
-	}
-	else if(connfd < 0)
-		printf("%s line = %d , %s \n",__FILE__,__LINE__,strerror(errno));
-	
-	len -= offsetof(struct sockaddr_un , sun_path);
-	memset(name,0,sizeof(name));
-	memcpy(name,un.sun_path,len);
-	name[len] = 0;
+	/* From the cmsg(3) manpage: */
+	struct msghdr msg = { 0 };
+	struct cmsghdr *cmsg;
+	struct iovec iov;
+	char c = 0;
+	union {         /* Ancillary data buffer, wrapped in a union
+			   in order to ensure it is suitably aligned */
+		char buf[CMSG_SPACE(sizeof(fd))];
+		struct cmsghdr align;
+	} u;
 
-	if(stat(name , &statbuf) < 0){
-		printf("%s line = %d , %s name %s\n",__FILE__,__LINE__,strerror(errno),name);
-		return -1;
-	}
-	
-	
-	if(S_ISSOCK(statbuf.st_mode) == 0){
-		printf("%s line = %d , %s \n",__FILE__,__LINE__,strerror(errno));
-		return -1;
-	}
+	msg.msg_control = u.buf;
+	msg.msg_controllen = sizeof(u.buf);
+	memset(&u, 0, sizeof(u));
+	cmsg = CMSG_FIRSTHDR(&msg);
+	cmsg->cmsg_level = SOL_SOCKET;
+	cmsg->cmsg_type = SCM_RIGHTS;
+	cmsg->cmsg_len = CMSG_LEN(sizeof(fd));
+	memcpy(CMSG_DATA(cmsg), &fd, sizeof(fd));
 
-	strcpy(cli_name,name);
-	
-	return connfd;
-}
-
-/*int multi_client_conn_thread(void *args,void *(*start_routine) (void *))
-{
-	pthread_t thread_id;
-	
-	if(pthread_create(&thread_id,NULL,start_routine,args) < 0){		
-		printf("%s line = %d , %s \n",__FILE__,__LINE__,strerror(errno));
-		return -1;
-	}
-
-	pthread_detach(thread_id);
-
-	return 0;
-}*/
-
-int connect_unix_tcp(int sockfd , const char *server_name)
-{
-	struct sockaddr_un un;
-	socklen_t len ;
-
-	if(sockfd < 0)
-		return -1;
-	
-	memset(&un,0,sizeof(un));
-	un.sun_family = AF_UNIX;
-	strcpy(un.sun_path,server_name);
-	len = offsetof(struct sockaddr_un , sun_path)+strlen(server_name);
-	
-	if(connect(sockfd,(struct sockaddr *)&un,len) < 0){
-		printf("%s line=%d %s \n",__FUNCTION__,__LINE__,strerror(errno));
-		return -1;
-	}
-	
-	return 0;
-}
-
-int send_fd_unix_domain(int sockfd , int fd_to_send)
-{
-	if(sockfd < 0 )
-		return -1;
-
-	struct iovec iov[1];
-	struct msghdr msg;
-	unsigned char buf[2] = {0};
-	struct cmsghdr *cmsgptr = (struct cmsghdr*)(char [CMSG_LEN(sizeof(int))]){0};
-	
-	iov[0].iov_base = buf;
-	iov[0].iov_len = sizeof(buf);
-
-	msg.msg_iov = iov;
-	msg.msg_iovlen = 1;
 	msg.msg_name = NULL;
 	msg.msg_namelen = 0;
+	msg.msg_iov = &iov;
+	msg.msg_iovlen = 1;
+	msg.msg_flags = 0;
 
-	if(fd_to_send < 0)
-	{
-		msg.msg_control = NULL;
-		msg.msg_controllen = 0;
-		buf[1] = -fd_to_send;
-		if(buf[1] == 0)
-			buf[1] = 1;
-	}
-	else
-	{
-		cmsgptr->cmsg_level = SOL_SOCKET;
-		cmsgptr->cmsg_type = SCM_RIGHTS;
-		cmsgptr->cmsg_len = CMSG_LEN(sizeof(int));
+	/* Keith Packard reports that 0-length sends don't work, so we
+	 * always send 1 byte. */
+	iov.iov_base = &c;
+	iov.iov_len = 1;
 
-		msg.msg_control = cmsgptr;
-		msg.msg_controllen = CMSG_LEN(sizeof(int));
-		*(int *)CMSG_DATA(cmsgptr) = fd_to_send;
-	}
-
-	
-	int ret = sendmsg(sockfd, &msg, 0); 
-	if( ret !=  sizeof(buf)){
-		printf("%s line=%d %s \n",__FUNCTION__,__LINE__,strerror(errno));
-		return -1;
-	}
-
-	return 0;
+	return sendmsg(sockout, &msg, 0) == 1;
 }
+
 
 int send_errno_unix_domain(int sockfd , int errcode , const char *msg)
 {
-	int n ;
-
-	if(errcode >= 0)
-		return -1;
-
-	if((n =  strlen(msg)) > 0)
-		if(tcp_send_noblock(sockfd,(void*)msg,n) != n)
-			return -1;
-
-	if(send_fd_unix_domain(sockfd,errcode) < 0)
-		return -1;
-
 	return 0;
 }
 
-int recv_fd_unix_domain(int sockfd)
+int recv_fd_unix_domain(int sockin)
 {
-	struct iovec iov[1];
-	struct msghdr msg;
-	unsigned char buf[128] = {0};
-	unsigned char *ptr = NULL;
-	int nr,newfd,status = -1;
-	struct cmsghdr *cmsgptr = (struct cmsghdr*)(char [CMSG_LEN(sizeof(int))]){0};
+	/* From the cmsg(3) manpage: */
+	struct msghdr msg = { 0 };
+	struct cmsghdr *cmsg;
+	struct iovec iov;
+	int fd;
+	char c;
+	union {         /* Ancillary data buffer, wrapped in a union
+			   in order to ensure it is suitably aligned */
+		char buf[CMSG_SPACE(sizeof(fd))];
+		struct cmsghdr align;
+	} u;
 
-	for(;;)
-	{
-		iov[0].iov_base = buf;
-		iov[0].iov_len = sizeof(buf);
+	msg.msg_control = u.buf;
+	msg.msg_controllen = sizeof(u.buf);
 
-		msg.msg_iov = iov;
-		msg.msg_iovlen = 1;
-		msg.msg_name = NULL;
-		msg.msg_namelen = 0;
-		msg.msg_control = cmsgptr;
-		msg.msg_controllen = CMSG_LEN(sizeof(int));
+	msg.msg_name = NULL;
+	msg.msg_namelen = 0;
+	msg.msg_iov = &iov;
+	msg.msg_iovlen = 1;
+	msg.msg_flags = 0;
 
-		nr = recvmsg(sockfd,&msg,0);
-		if(nr < 0)
-			return -1;
-		else if(nr == 0)
-			return -1;
+	iov.iov_base = &c;
+	iov.iov_len = 1;
 
-		for(ptr=buf;ptr<&buf[nr];)
-		{
-			if(*ptr++ == 0){
+	if (recvmsg(sockin, &msg, 0) < 0)
+		return -1;
 
-				if(ptr != &buf[nr-1])
-					printf("message format error \n");
-
-				status = *ptr & 0xFF;
-				if(status == 0){
-
-					if(msg.msg_controllen < CMSG_LEN(sizeof(int)))
-						printf("status 0 but no fd \n");
-					newfd = *(int *)CMSG_DATA(cmsgptr);
-				}else {
-					
-					newfd = -status;
-				}
-
-				nr -= 2;
-			}
-
-		}
-
-		//if(nr > 0 && status != 0)
-		//	return -1;
-		if(status >= 0)
-			return newfd;
-		
+	cmsg = CMSG_FIRSTHDR(&msg);
+        if (!cmsg
+	    || cmsg->cmsg_len != CMSG_LEN(sizeof(fd))
+	    || cmsg->cmsg_level != SOL_SOCKET
+	    || cmsg->cmsg_type != SCM_RIGHTS) {
+		errno = -EINVAL;
+		return -1;
 	}
 
-	return -1;
+	memcpy(&fd, CMSG_DATA(cmsg), sizeof(fd));
+	return fd;
 }
+
 
 int tcp_recv_protocol_cmd(int sockfd,void* cmd_head,void *data)
 {
 	int totallen = 0,readlen = 0;
-	int times = 2000;
+	int times = 500;
 	
 	if(cmd_head == NULL || data ==NULL || sockfd < 0)
-		return 0;
+		return -1;
 
 	for (totallen = 0; totallen < PROTOCOL_CMD_HEAD_LEN; )
 	{
 		readlen = recv(sockfd,cmd_head + totallen, PROTOCOL_CMD_HEAD_LEN-totallen,MSG_DONTWAIT);
 		if(readlen < 0){
-			if(!(times--))
+			if(!(times--)){
+				fprintf(stderr,"tcp_recv_protocol_cmd time out  \n");
 				break;
+			}
 			
 			if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR){
 				usleep(2000);
 				continue;
 			}
-			printf("%s \n",strerror(errno));
-			break;
+			fprintf(stderr,"%s \n",strerror(errno));
+
+			return readlen;
 		}
 		else if(readlen == 0)
 			break;
@@ -277,21 +176,27 @@ int tcp_recv_protocol_cmd(int sockfd,void* cmd_head,void *data)
 	if(totallen != PROTOCOL_CMD_HEAD_LEN)
 		return -1;
 
-	int bodylen = GET_PROTOCOL_BODY_LEN(cmd_head);
+	if(!CHECK_MAGIC(cmd_head))
+		return -1;
 
-	for (totallen = 0;totallen < bodylen;)
-	{
-		readlen = recv(sockfd,data + totallen,bodylen-totallen,MSG_DONTWAIT);
+	
+	int body_len = GET_PROTOCOL(cmd_head,bodylen);
+
+	for (totallen = 0;totallen < body_len;){
+		readlen = recv(sockfd,data + totallen,body_len-totallen,MSG_DONTWAIT);
 		if(readlen < 0){
-			if(!(times--))
+			if(!(times--)){
+				fprintf(stderr,"tcp_recv_protocol_cmd time out  \n");
 				break;
+			}
 			
 			if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR){
 				usleep(2000);
 				continue;
 			}
-			printf("%s \n",strerror(errno));
-			break;
+			fprintf(stderr,"%s \n",strerror(errno));
+
+			return readlen;
 		}
 		else if(readlen == 0)
 			break;
@@ -299,7 +204,7 @@ int tcp_recv_protocol_cmd(int sockfd,void* cmd_head,void *data)
 			totallen += readlen;	
 	}
 	
-	if(totallen != bodylen)
+	if(totallen != body_len)
 		return -1;
 	
 	return 0;
@@ -308,16 +213,17 @@ int tcp_recv_protocol_cmd(int sockfd,void* cmd_head,void *data)
 int tcp_send_protocol_cmd(int sockfd,void* cmd_head,void *data)
 {
 	int totallen = 0,sendlen = 0;
-	int times = 2000;
+	int times = 500;
 	
 	if(data ==NULL || cmd_head == NULL || sockfd < 0)
-		return 0;
+		return -1;
 
-	for (totallen = 0; totallen < PROTOCOL_CMD_HEAD_LEN; )
-	{
+	if(!CHECK_MAGIC(cmd_head))
+		return -1;
+	
+	for (totallen = 0; totallen < PROTOCOL_CMD_HEAD_LEN; ){
 		sendlen = send(sockfd,cmd_head + totallen, PROTOCOL_CMD_HEAD_LEN-totallen,MSG_DONTWAIT);
-		if(sendlen < 0 )
-		{
+		if(sendlen < 0 ){
 			if(!(times--))
 				break;
 			
@@ -325,8 +231,8 @@ int tcp_send_protocol_cmd(int sockfd,void* cmd_head,void *data)
 				usleep(2000);
 				continue;
 			}
-			
-			break;
+			fprintf(stderr,"%s \n",strerror(errno));
+			return sendlen;
 		}
 		else if(sendlen == 0)
 			break;
@@ -338,12 +244,11 @@ int tcp_send_protocol_cmd(int sockfd,void* cmd_head,void *data)
 		return -1;
 
 	
-	int bodylen = GET_PROTOCOL_BODY_LEN(cmd_head);
-
+	int body_len = GET_PROTOCOL(cmd_head,bodylen);
 	
-	for (totallen = 0; totallen < bodylen; )
+	for (totallen = 0; totallen < body_len; )
 	{
-		sendlen = send(sockfd,data + totallen, bodylen-totallen,MSG_DONTWAIT);
+		sendlen = send(sockfd,data + totallen, body_len-totallen,MSG_DONTWAIT);
 		if(sendlen < 0 ){
 			if(!(times--))
 				break;
@@ -353,7 +258,8 @@ int tcp_send_protocol_cmd(int sockfd,void* cmd_head,void *data)
 				continue;
 			}
 			
-			break;
+			fprintf(stderr,"%s \n",strerror(errno));
+			return sendlen;
 		}
 		else if(sendlen == 0)
 			break;
@@ -361,25 +267,144 @@ int tcp_send_protocol_cmd(int sockfd,void* cmd_head,void *data)
 			totallen += sendlen;
 	}
 
-	if(totallen != bodylen)
+	if(totallen != body_len)
 		return -1;
 	
 	return 0;	
 }
 
-int wait_all_unix_connet(int sockfd)
+int tcp_send_protocol(int sockfd,void* cmd_head,void *cmd_head_data,int cmd_head_data_len,void *data,int datelen)
 {
-	uint8_t buf[1+CMD_ALL_CONNECT_OK_LEN] = {0};
-
-	int ret = recv(sockfd,buf,CMD_ALL_CONNECT_OK_LEN,MSG_WAITALL);
-	if(ret != CMD_ALL_CONNECT_OK_LEN)
+	int totallen = 0,sendlen = 0;
+	int times = 500;
+	
+	if(data ==NULL || cmd_head == NULL || sockfd < 0 || cmd_head_data == NULL)
 		return -1;
 
-	//for(int i=0;i<CMD_ALL_CONNECT_OK_LEN;i++)
-	//	printf("[%d] %x \n",i,CMD_ALL_CONNECT_OK[i]);
-		
-	if(isMemSameN(buf,CMD_ALL_CONNECT_OK,CMD_ALL_CONNECT_OK_LEN))
-		return 0;
+	if(!CHECK_MAGIC(cmd_head))
+		return -1;
 	
-	return -1;
+	for (totallen = 0; totallen < PROTOCOL_CMD_HEAD_LEN; ){
+		sendlen = send(sockfd,cmd_head + totallen, PROTOCOL_CMD_HEAD_LEN-totallen,MSG_DONTWAIT);
+		if(sendlen < 0 ){
+			if(!(times--))
+				break;
+			
+			if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR){
+				usleep(2000);
+				continue;
+			}
+			fprintf(stderr,"%s \n",strerror(errno));
+			return sendlen;
+		}
+		else if(sendlen == 0)
+			break;
+		else
+			totallen += sendlen;
+	}
+
+	if(totallen != PROTOCOL_CMD_HEAD_LEN)
+		return -1;
+
+
+	for (totallen = 0; totallen < cmd_head_data_len; )
+	{
+		sendlen = send(sockfd,cmd_head_data + totallen, cmd_head_data_len-totallen,MSG_DONTWAIT);
+		if(sendlen < 0 ){
+			if(!(times--))
+				break;
+			
+			if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR){
+				usleep(2000);
+				continue;
+			}
+			
+			fprintf(stderr,"%s \n",strerror(errno));
+			return sendlen;
+		}
+		else if(sendlen == 0)
+			break;
+		else
+			totallen += sendlen;
+	}
+
+	if(totallen != cmd_head_data_len)
+		return -1;
+
+	for (totallen = 0; totallen < datelen; )
+	{
+		sendlen = send(sockfd,data + totallen, datelen-totallen,MSG_DONTWAIT);
+		if(sendlen < 0 ){
+			if(!(times--))
+				break;
+			
+			if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR){
+				usleep(2000);
+				continue;
+			}
+			
+			fprintf(stderr,"%s \n",strerror(errno));
+			return sendlen;
+		}
+		else if(sendlen == 0)
+			break;
+		else
+			totallen += sendlen;
+	}
+
+	if(totallen != datelen)
+		return -1;
+	
+	return 0;	
+
+
+
+
+}
+uint16_t parse_decimal_dot_string_to_hex(const char *input) {
+    char *dot = NULL;
+    char first_part[4] = {0};
+    char second_part[4] = {0};
+
+    dot = strchr(input, '.');
+    if (!dot || dot == input || (dot-input) > 3) {
+        fprintf(stderr, "Invalid format: missing or misplaced dot\n");
+        return 0;
+    }
+
+    size_t first_len = dot - input;
+   //size_t second_len = strlen(dot + 1);
+
+    strncpy(first_part, input, first_len);
+    strcpy(second_part, dot + 1);
+
+    for (int i = 0; first_part[i]; i++) {
+        if (!isdigit(first_part[i])) {
+            fprintf(stderr, "Invalid decimal number: %s\n", first_part);
+            return 0;
+        }
+    }
+    for (int i = 0; second_part[i]; i++) {
+        if (!isdigit(second_part[i])) {
+            fprintf(stderr, "Invalid decimal number: %s\n", second_part);
+            return 0;
+        }
+    }
+
+    int first_val = atoi(first_part);
+    int second_val = atoi(second_part);
+
+    if (first_val < 0 || first_val > 255 || second_val < 0 || second_val > 255) {
+        fprintf(stderr, "Value out of range (must be 0-255): %s.%s\n", first_part, second_part);
+        return 0;
+    }
+
+    unsigned short result = ((unsigned char)first_val << 8) | (unsigned char)second_val;
+
+    return result;
+}
+
+int wait_all_unix_connet(int sockfd)
+{
+	return 0;
 }

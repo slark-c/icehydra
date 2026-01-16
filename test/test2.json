@@ -3,25 +3,22 @@
 	"ih-pid"  : 0,
 	"ih-shm":[
 		{
-		 "shm_name":"testname0",
-		 "shm_size":128
+		 "shm-type":"sysv",
+		 "shm-name":"buffer0",
+		 "shm-size":128
 		},
 		{
-		 "shm_name":"testname1",
-		 "shm_size":256
+		 "shm-name":"buffer1",
+		 "shm-size":256
 		},
 		{
-		 "shm_name":"testname2",
-		 "shm_size":512
+		 "shm-name":"buffer2",
+		 "shm-size":512
 		},
 		{
-		 "shm_name":"testname3",
-		 "shm_size":1024
+		 "shm-name":"buffer3",
+		 "shm-size":1024
 		}
 	],
 	"ih-cpu_bind":0
-}
-{
-	"ih-name":"test2-Subscriber-1",
-	"ih-pid"  : 100
 }
